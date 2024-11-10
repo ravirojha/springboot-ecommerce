@@ -6,6 +6,8 @@ import com.ravi.ecommerce.kafka.OrderConfirmation;
 import com.ravi.ecommerce.kafka.OrderProducer;
 import com.ravi.ecommerce.orderline.OrderLineRequest;
 import com.ravi.ecommerce.orderline.OrderLineService;
+import com.ravi.ecommerce.payment.PaymentClient;
+import com.ravi.ecommerce.payment.PaymentRequest;
 import com.ravi.ecommerce.product.ProductClient;
 import com.ravi.ecommerce.product.PurchaseRequest;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +27,7 @@ public class OrderService {
     private final ProductClient productClient;
     private final OrderLineService orderLineService;
     private final OrderProducer orderProducer;
+    private final PaymentClient paymentClient;
     public Integer createOrder(@Valid OrderRequest request) {
         var customer = this.customerClient.findCustomerById(request.customerId()).orElseThrow(() -> new BusinessException("Cannot create order:: Customer does not exists"));
 
@@ -43,7 +46,14 @@ public class OrderService {
             );
         }
 
-        // todo start payment process
+        var paymentRequest = new PaymentRequest(
+                request.amount(),
+                request.paymentMethod(),
+                order.getId(),
+                order.getReference(),
+                customer
+        );
+        paymentClient.requestOrderPayment(paymentRequest);
 
         orderProducer.sendOrderConfirmation(
                 new OrderConfirmation(
